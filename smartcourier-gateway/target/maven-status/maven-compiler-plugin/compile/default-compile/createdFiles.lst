@@ -1,0 +1,5 @@
+com\smartcourier\gateway\config\ZipkinTracingConfig.class
+com\smartcourier\gateway\GatewayApplication.class
+com\smartcourier\gateway\util\JwtUtil.class
+com\smartcourier\gateway\config\TracingPropagationFilter.class
+com\smartcourier\gateway\filter\GatewayAuthFilter.class

@@ -1,0 +1,100 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=1
+        - id: delivery-service
+          uri: lb://delivery-service
+          predicates:
+            - Path=/api/deliveries/**
+          filters:
+            - StripPrefix=1
+        - id: tracking-service
+          uri: lb://tracking-service
+          predicates:
+            - Path=/api/tracking/**
+          filters:
+            - StripPrefix=1
+        - id: admin-service
+          uri: lb://admin-service
+          predicates:
+            - Path=/api/admin/**
+          filters:
+            - StripPrefix=1
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**
+          filters:
+            - StripPrefix=1
+        - id: auth-service-swagger
+          uri: lb://auth-service
+          predicates:
+            - Path=/swagger-auth/**
+          filters:
+            - RewritePath=/swagger-auth/(?<segment>.*), /$\{segment}
+        - id: delivery-service-swagger
+          uri: lb://delivery-service
+          predicates:
+            - Path=/swagger-delivery/**
+          filters:
+            - RewritePath=/swagger-delivery/(?<segment>.*), /$\{segment}
+        - id: tracking-service-swagger
+          uri: lb://tracking-service
+          predicates:
+            - Path=/swagger-tracking/**
+          filters:
+            - RewritePath=/swagger-tracking/(?<segment>.*), /$\{segment}
+        - id: admin-service-swagger
+          uri: lb://admin-service
+          predicates:
+            - Path=/swagger-admin/**
+          filters:
+            - RewritePath=/swagger-admin/(?<segment>.*), /$\{segment}
+        - id: notification-service-swagger
+          uri: lb://notification-service
+          predicates:
+            - Path=/swagger-notification/**
+          filters:
+            - RewritePath=/swagger-notification/(?<segment>.*), /$\{segment}
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+
+eureka:
+  instance:
+    hostname: api-gateway
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/
+
+jwt:
+  secret: SmartCourierSecretKeyForJWTTokenGenerationAndValidation2024VeryLongSecureKey
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,prometheus,tracing
+  endpoint:
+    gateway:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans

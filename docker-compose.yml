@@ -1,0 +1,401 @@
+services:
+  # Infrastructure Services
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: smartcourier-postgres-auth
+    hostname: postgres-auth
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: SmartCourier@2024
+      POSTGRES_DB: smartcourier
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+      - ./docker/init-auth.sql:/docker-entrypoint-initdb.d/init-auth.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      smartcourier-network:
+        aliases:
+          - postgres-auth
+
+  postgres-delivery:
+    image: postgres:16-alpine
+    container_name: smartcourier-postgres-delivery
+    hostname: postgres-delivery
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: SmartCourier@2024
+      POSTGRES_DB: smartcourier
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-delivery-data:/var/lib/postgresql/data
+      - ./docker/init-delivery.sql:/docker-entrypoint-initdb.d/init-delivery.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      smartcourier-network:
+        aliases:
+          - postgres-delivery
+
+  postgres-tracking:
+    image: postgres:16-alpine
+    container_name: smartcourier-postgres-tracking
+    hostname: postgres-tracking
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: SmartCourier@2024
+      POSTGRES_DB: smartcourier
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres-tracking-data:/var/lib/postgresql/data
+      - ./docker/init-tracking.sql:/docker-entrypoint-initdb.d/init-tracking.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      smartcourier-network:
+        aliases:
+          - postgres-tracking
+
+  postgres-admin:
+    image: postgres:16-alpine
+    container_name: smartcourier-postgres-admin
+    hostname: postgres-admin
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: SmartCourier@2024
+      POSTGRES_DB: smartcourier
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres-admin-data:/var/lib/postgresql/data
+      - ./docker/init-admin.sql:/docker-entrypoint-initdb.d/init-admin.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      smartcourier-network:
+        aliases:
+          - postgres-admin
+
+  postgres-notification:
+    image: postgres:16-alpine
+    container_name: smartcourier-postgres-notification
+    hostname: postgres-notification
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: SmartCourier@2024
+      POSTGRES_DB: notification_db
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres-notification-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      smartcourier-network:
+        aliases:
+          - postgres-notification
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: smartcourier-rabbitmq
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: smartcourier
+      RABBITMQ_DEFAULT_PASS: smartcourier
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      smartcourier-network:
+        aliases:
+          - rabbitmq
+
+  maildev:
+    image: maildev/maildev:latest
+    container_name: smartcourier-maildev
+    hostname: maildev
+    ports:
+      - "1080:1080"
+      - "1025:1025"
+    networks:
+      smartcourier-network:
+        aliases:
+          - maildev
+
+  eureka-server:
+    build:
+      context: ./smartcourier-eureka
+      dockerfile: Dockerfile
+    container_name: smartcourier-eureka
+    hostname: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8761/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      smartcourier-network:
+        aliases:
+          - eureka-server
+
+  config-server:
+    build:
+      context: ./smartcourier-config
+      dockerfile: Dockerfile
+    container_name: smartcourier-config
+    hostname: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    volumes:
+      - ./config-repo:/config-repo
+    networks:
+      smartcourier-network:
+        aliases:
+          - config-server
+
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: smartcourier-zipkin
+    hostname: zipkin
+    ports:
+      - "9411:9411"
+    environment:
+      STORAGE_TYPE: mem
+    networks:
+      smartcourier-network:
+        aliases:
+          - zipkin
+
+  sonarqube:
+    image: sonarqube:9.9.6-community
+    container_name: smartcourier-sonarqube
+    hostname: sonarqube
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+      SONAR_JDBC_URL: jdbc:postgresql://postgres-sonar:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonarqube
+      SONAR_JDBC_PASSWORD: sonarqube
+    volumes:
+      - sonarqube-data:/opt/sonarqube/data
+      - sonarqube-logs:/opt/sonarqube/logs
+      - sonarqube-extensions:/opt/sonarqube/extensions
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      smartcourier-network:
+        aliases:
+          - sonarqube
+
+  postgres-sonar:
+    image: postgres:16-alpine
+    container_name: smartcourier-postgres-sonar
+    hostname: postgres-sonar
+    environment:
+      POSTGRES_USER: sonarqube
+      POSTGRES_PASSWORD: sonarqube
+      POSTGRES_DB: sonarqube
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres-sonar-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonarqube"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      smartcourier-network:
+        aliases:
+          - postgres-sonar
+
+  # Application Services
+  api-gateway:
+    build:
+      context: ./smartcourier-gateway
+      dockerfile: Dockerfile
+    container_name: smartcourier-gateway
+    hostname: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      smartcourier-network:
+        aliases:
+          - api-gateway
+          - gateway
+
+  auth-service:
+    build:
+      context: ./smartcourier-auth
+      dockerfile: Dockerfile
+    container_name: smartcourier-auth
+    hostname: auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-auth:5432/smartcourier?currentSchema=auth
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      smartcourier-network:
+        aliases:
+          - auth-service
+          - auth
+
+  delivery-service:
+    build:
+      context: ./smartcourier-delivery
+      dockerfile: Dockerfile
+    container_name: smartcourier-delivery
+    hostname: delivery-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-delivery:5432/smartcourier?currentSchema=delivery
+    depends_on:
+      postgres-delivery:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      smartcourier-network:
+        aliases:
+          - delivery-service
+          - delivery
+
+  tracking-service:
+    build:
+      context: ./smartcourier-tracking
+      dockerfile: Dockerfile
+    container_name: smartcourier-tracking
+    hostname: tracking-service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-tracking:5432/smartcourier?currentSchema=tracking
+    depends_on:
+      postgres-tracking:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      smartcourier-network:
+        aliases:
+          - tracking-service
+          - tracking
+
+  admin-service:
+    build:
+      context: ./smartcourier-admin
+      dockerfile: Dockerfile
+    container_name: smartcourier-admin
+    hostname: admin-service
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-admin:5432/smartcourier?currentSchema=admin
+    depends_on:
+      postgres-admin:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      smartcourier-network:
+        aliases:
+          - admin-service
+          - admin
+
+  notification-service:
+    build:
+      context: ./smartcourier-notification
+      dockerfile: Dockerfile
+    container_name: smartcourier-notification
+    hostname: notification-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-notification:5432/notification_db
+      SPRING_MAIL_HOST: maildev
+      SPRING_MAIL_PORT: 1025
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      maildev:
+        condition: service_started
+    networks:
+      smartcourier-network:
+        aliases:
+          - notification-service
+          - notification
+
+volumes:
+  postgres-auth-data:
+  postgres-delivery-data:
+  postgres-tracking-data:
+  postgres-admin-data:
+  postgres-notification-data:
+  postgres-sonar-data:
+  sonarqube-data:
+  sonarqube-logs:
+  sonarqube-extensions:
+
+networks:
+  smartcourier-network:
+    driver: bridge
